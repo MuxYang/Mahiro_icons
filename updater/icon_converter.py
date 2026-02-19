@@ -29,13 +29,15 @@ except ImportError:
 class IconConverter:
     """Handle icon conversion operations"""
     
-    SIZES = [64, 128, 256, 512, 1024]
+    PNG_JPG_SIZES = [64, 128, 256, 512, 1024]
+    ICO_SIZES = [16, 32, 64, 128, 256]
     OUTPUT_FORMATS = ['ico', 'png', 'jpg']
     
-    def __init__(self):
+    def __init__(self, force_regenerate: bool = False):
         self.converted_files: Set[str] = set()
         self.base_path = self._find_icons_folder()
         self.converted_file_path = self._get_converted_file_path()
+        self.force_regenerate = force_regenerate
         self._load_converted_list()
     
     def _find_executable_path(self) -> Path:
@@ -182,7 +184,8 @@ class IconConverter:
             with Image.open(png_temp) as img:
                 success = True
                 
-                for size in self.SIZES:
+                # PNG and JPG use larger sizes
+                for size in self.PNG_JPG_SIZES:
                     # Resize image
                     resized = img.resize((size, size), Image.Resampling.LANCZOS)
                     
@@ -205,13 +208,22 @@ class IconConverter:
                     else:
                         resized.save(jpg_path, 'JPEG', quality=95)
                     logger.info(f"Created: {jpg_path}")
+                
+                # ICO uses smaller sizes
+                for size in self.ICO_SIZES:
+                    # Resize image
+                    resized = img.resize((size, size), Image.Resampling.LANCZOS)
                     
-                    # Save as ICO
+                    # Save as ICO (preserve transparency)
                     ico_folder = folder_path / "ico"
                     ico_folder.mkdir(exist_ok=True)
                     ico_path = ico_folder / f"{base_name}_{size}.ico"
-                    resized.save(ico_path, 'ICO')
-                    logger.info(f"Created: {ico_path}")
+                    # Save ICO directly, preserving transparency for RGBA images
+                    try:
+                        resized.save(ico_path, 'ICO')
+                        logger.info(f"Created: {ico_path}")
+                    except Exception as e:
+                        logger.error(f"Failed to create ICO {ico_path}: {e}")
             
             # Clean up temp file
             if png_temp.exists():
@@ -262,6 +274,13 @@ class IconConverter:
         """Process a single icon folder"""
         folder_name = folder_path.name
         logger.info(f"\nProcessing folder: {folder_name}")
+        
+        # Check for name.ini file
+        name_ini = folder_path / "name.ini"
+        if not name_ini.exists():
+            logger.error(f"✗ name.ini not found in {folder_name}")
+            self._wait_for_user_input(folder_name)
+            return False
         
         # Check for update marker files
         update_svg_file = None
@@ -364,9 +383,21 @@ class IconConverter:
                     return False
         
         # Normal processing (for newly discovered icons)
-        if folder_name in self.converted_files:
+        if folder_name in self.converted_files and not self.force_regenerate:
             logger.info(f"Skipping {folder_name} (already converted)")
             return True
+        
+        # If force regenerate, delete existing converted files
+        if self.force_regenerate and folder_name in self.converted_files:
+            logger.info(f"Force regenerating {folder_name}...")
+            # Find SVG to get base name
+            svg_file = None
+            for file in folder_path.iterdir():
+                if file.is_file() and file.suffix.lower() == '.svg':
+                    svg_file = file
+                    break
+            if svg_file:
+                self._delete_converted_files(folder_path, svg_file.stem)
         
         svg_file = None
         xml_file = None
@@ -414,6 +445,8 @@ class IconConverter:
         logger.info("=" * 60)
         logger.info("Icon Converter Started")
         logger.info(f"Icons folder: {self.base_path}")
+        if self.force_regenerate:
+            logger.info("Force regenerate mode: ON")
         logger.info("=" * 60)
         
         if not self.base_path.exists():
@@ -447,7 +480,10 @@ class IconConverter:
 def main():
     """Main entry point"""
     try:
-        converter = IconConverter()
+        # Parse command line arguments
+        force_regenerate = '-f' in sys.argv or '--force' in sys.argv
+        
+        converter = IconConverter(force_regenerate=force_regenerate)
         success = converter.run()
         sys.exit(0 if success else 1)
     except Exception as e:

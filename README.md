@@ -2,17 +2,17 @@
 
 # Mahiro icons
 
-IMAGE PLACEHOLDER
+[![Logo](res/Logo.png)](https://mahiroicon.muxyang.com/)
 
-LANGUAGE PLACEHOLDER
+[简体中文](README.md) | [English](README.en.md)
+
+绪山真寻主题配色的图标库。
 
 </div>
 
-绪山真寻主题的图标库。
+# 下载
 
-# 下载与使用
-
-欢迎前往网站[PLACEHOLDER]下载各种格式的图标，您也可以直接在Github网站中下载您需要的图标。
+欢迎前往网站 [mahiroicon.muxyang.com](https://mahiroicon.muxyang.com/) 下载各种格式的图标，您也可以直接在 Github 网站中下载您需要的图标。
 
 # 贡献
 
