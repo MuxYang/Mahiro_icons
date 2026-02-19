@@ -1,0 +1,16 @@
+name: Trigger Pages Rebuild
+on:
+  push:
+    paths:
+      - 'icons/**'
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger rebuild of web repo
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.WEB_REPO_PAT }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/MuxYang/Mahiro_icons_web/dispatches \
+            -d '{"event_type": "icons-updated"}'

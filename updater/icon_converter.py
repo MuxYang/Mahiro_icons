@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from typing import Set, List
 import logging
+import xml.etree.ElementTree as ET
 
 # Setup logging
 logging.basicConfig(
@@ -104,6 +105,61 @@ class IconConverter:
         except Exception as e:
             logger.error(f"Failed to convert {svg_path} to PNG: {e}")
             return False
+    
+    def _check_svg_size(self, svg_path: Path) -> bool:
+        """Check if SVG width and height are 800"""
+        try:
+            tree = ET.parse(svg_path)
+            root = tree.getroot()
+            width = root.get('width')
+            height = root.get('height')
+            
+            if not width or not height:
+                logger.error(f"Missing width or height attribute in {svg_path}")
+                return False
+            
+            # Remove 'px' suffix if present
+            width_str = str(width).rstrip('px')
+            height_str = str(height).rstrip('px')
+            
+            try:
+                width_val = float(width_str)
+                height_val = float(height_str)
+                
+                if width_val == 800 and height_val == 800:
+                    logger.info(f"✓ SVG size check passed: {svg_path.name} is 800x800")
+                    return True
+                else:
+                    logger.error(f"✗ SVG size mismatch: {svg_path.name} is {width_val}x{height_val}, expected 800x800")
+                    return False
+            except ValueError:
+                logger.error(f"Failed to parse width/height values: width={width}, height={height}")
+                return False
+        except Exception as e:
+            logger.error(f"Failed to check SVG size: {e}")
+            return False
+    
+    def _wait_for_user_input(self, folder_name: str):
+        """Pause and wait for user input"""
+        print(f"\n{'='*60}")
+        print(f"⚠ Processing paused for: {folder_name}")
+        print(f"{'='*60}")
+        try:
+            input("按任意键继续... (Press any key to continue...)")
+        except (EOFError, KeyboardInterrupt):
+            pass
+    
+    def _delete_converted_files(self, folder_path: Path, base_name: str):
+        """Delete all previously converted files (png, jpg, ico)"""
+        for format_dir in self.OUTPUT_FORMATS:
+            dir_path = folder_path / format_dir
+            if dir_path.exists():
+                for file in dir_path.glob(f"{base_name}_*.{format_dir if format_dir != 'ico' else 'ico'}"):
+                    try:
+                        file.unlink()
+                        logger.info(f"Deleted: {file}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete {file}: {e}")
     
     def _create_variants(self, source_path: Path, folder_path: Path, base_name: str) -> bool:
         """Create variants in different sizes and formats"""
@@ -207,6 +263,107 @@ class IconConverter:
         folder_name = folder_path.name
         logger.info(f"\nProcessing folder: {folder_name}")
         
+        # Check for update marker files
+        update_svg_file = None
+        update_xml_file = None
+        for file in folder_path.glob("*"):
+            if file.is_file() and file.suffix.lower() == ".updatesvg":
+                update_svg_file = file
+            elif file.is_file() and file.suffix.lower() == ".updatexml":
+                update_xml_file = file
+        
+        # If update files exist, only proceed if the icon is already in .converted
+        if update_svg_file or update_xml_file:
+            if folder_name not in self.converted_files:
+                logger.info(f"Skipping {folder_name} (update file found but not in .converted)")
+                return True
+            
+            logger.info(f"Found update files for {folder_name}, regenerating...")
+            
+            svg_file = None
+            xml_file = None
+            
+            # Find SVG or XML file
+            for file in folder_path.iterdir():
+                if file.is_file():
+                    if file.suffix.lower() == '.svg':
+                        svg_file = file
+                    elif file.suffix.lower() == '.xml':
+                        xml_file = file
+            
+            # Handle .updatesvg: delete SVG and regenerate everything
+            if update_svg_file and svg_file:
+                base_name = svg_file.stem
+                logger.info(f"Deleting previously converted files for .updatesvg")
+                self._delete_converted_files(folder_path, base_name)
+                
+                # Delete the old SVG
+                try:
+                    svg_file.unlink()
+                    logger.info(f"Deleted: {svg_file}")
+                except Exception as e:
+                    logger.error(f"Failed to delete {svg_file}: {e}")
+                
+                # Delete the .updatesvg marker file
+                try:
+                    update_svg_file.unlink()
+                    logger.info(f"Deleted: {update_svg_file}")
+                except Exception as e:
+                    logger.error(f"Failed to delete {update_svg_file}: {e}")
+                
+                # If XML exists, use it to regenerate SVG, then regenerate everything
+                if xml_file and xml_file.exists():
+                    self._xml_to_svg(xml_file)
+                    svg_file = xml_file.parent / f"{xml_file.stem}.svg"
+                else:
+                    logger.warning(f"No XML file found to regenerate SVG for {folder_name}")
+                    return False
+            
+            # Handle .updatexml: delete XML and regenerate everything
+            if update_xml_file and xml_file:
+                base_name = xml_file.stem
+                logger.info(f"Deleting previously converted files for .updatexml")
+                self._delete_converted_files(folder_path, base_name)
+                
+                # Delete the old XML
+                try:
+                    xml_file.unlink()
+                    logger.info(f"Deleted: {xml_file}")
+                except Exception as e:
+                    logger.error(f"Failed to delete {xml_file}: {e}")
+                
+                # Delete the .updatexml marker file
+                try:
+                    update_xml_file.unlink()
+                    logger.info(f"Deleted: {update_xml_file}")
+                except Exception as e:
+                    logger.error(f"Failed to delete {update_xml_file}: {e}")
+                
+                # If SVG exists, use it to regenerate XML, then regenerate everything
+                if svg_file and svg_file.exists():
+                    self._svg_to_xml(svg_file)
+                    xml_file = svg_file.parent / f"{svg_file.stem}.xml"
+                else:
+                    logger.warning(f"No SVG file found to regenerate XML for {folder_name}")
+                    return False
+            
+            # Regenerate the converted files
+            if svg_file and svg_file.exists():
+                # Check SVG size before processing
+                if not self._check_svg_size(svg_file):
+                    self._wait_for_user_input(folder_name)
+                    return False
+                
+                base_name = svg_file.stem
+                success = self._create_variants(svg_file, folder_path, base_name)
+                if success:
+                    logger.info(f"✓ Successfully regenerated {folder_name}")
+                    return True
+                else:
+                    logger.error(f"Failed to regenerate {folder_name}")
+                    return False
+        
+        # Normal processing (for newly discovered icons)
         if folder_name in self.converted_files:
             logger.info(f"Skipping {folder_name} (already converted)")
             return True
@@ -236,6 +393,11 @@ class IconConverter:
         
         # Process the SVG file
         if svg_file and svg_file.exists():
+            # Check SVG size before processing
+            if not self._check_svg_size(svg_file):
+                self._wait_for_user_input(folder_name)
+                return False
+            
             base_name = svg_file.stem
             success = self._create_variants(svg_file, folder_path, base_name)
             

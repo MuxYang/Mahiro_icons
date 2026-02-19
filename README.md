@@ -18,9 +18,11 @@ LANGUAGE PLACEHOLDER
 
 欢迎提交图标，提交方式为：
 fork 本仓库，添加图标后提交 pull request。
-图标应当放置在icons目录下，需要有xml、svg、ico、jpg、png五种格式
-svg格式必须为800x800的大小，如果图标本身不是正方形的，请将图标放置在一个800x800的画布上，图标居中。
-创建图标时可以先创建xml或svg后使用updater文件夹内的icon_converter.py自动生成其他的格式。
+图标应当放置在`icons`目录下，需要有xml、svg、ico、jpg、png五种格式
+svg格式必须为**800x800**的大小，如果图标本身不是正方形的或图标过大/过小，请将图标调整为等比缩放到**800x800**大小。
+创建图标时可以先创建xml或svg后使用`updater`文件夹内的`icon_converter.py`自动生成其他的格式。
+如果您对图标文件进行了更改，请在该图标svg同级目录下创建标识文件，
+标识文件为`.updatexml`与`.updatesvg`，前者为删除xml重新生成；后者为删除svg重新生成。
 
 ```Python
 pip install -r requirements.txt
