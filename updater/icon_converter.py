@@ -275,24 +275,37 @@ class IconConverter:
         folder_name = folder_path.name
         logger.info(f"\nProcessing folder: {folder_name}")
         
-        # Check for name.ini file
+        # Check for name.ini file first
         name_ini = folder_path / "name.ini"
         if not name_ini.exists():
             logger.error(f"✗ name.ini not found in {folder_name}")
             self._wait_for_user_input(folder_name)
             return False
         
-        # Check for update marker files
+        # Check for update marker files - PRIORITY over "already converted" check
         update_svg_file = None
         update_xml_file = None
-        for file in folder_path.glob("*"):
-            if file.is_file() and file.suffix.lower() == ".updatesvg":
-                update_svg_file = file
-            elif file.is_file() and file.suffix.lower() == ".updatexml":
-                update_xml_file = file
         
-        # If update files exist, only proceed if the icon is already in .converted
+        # Check all files in the folder
+        for file in folder_path.iterdir():
+            if not file.is_file():
+                continue
+            file_name_lower = file.name.lower()
+            if file_name_lower.endswith('.updatesvg'):
+                update_svg_file = file
+                logger.info(f"⚠ Found .updatesvg marker file")
+            elif file_name_lower.endswith('.updatexml'):
+                update_xml_file = file
+                logger.info(f"⚠ Found .updatexml marker file")
+        
+        # Process updates regardless of conversion status
         if update_svg_file or update_xml_file:
+            logger.info(f"Found update marker files:")
+            if update_svg_file:
+                logger.info(f"  - .updatesvg: {update_svg_file.name}")
+            if update_xml_file:
+                logger.info(f"  - .updatexml: {update_xml_file.name}")
+            
             if folder_name not in self.converted_files:
                 logger.info(f"Skipping {folder_name} (update file found but not in .converted)")
                 return True
@@ -330,12 +343,20 @@ class IconConverter:
                 except Exception as e:
                     logger.error(f"Failed to delete {update_svg_file}: {e}")
                 
-                # If XML exists, use it to regenerate SVG, then regenerate everything
-                if xml_file and xml_file.exists():
+                # Re-scan for new SVG file
+                svg_file = None
+                for file in folder_path.iterdir():
+                    if file.is_file() and file.suffix.lower() == '.svg':
+                        svg_file = file
+                        break
+                
+                # If no new SVG found, try to regenerate from XML
+                if not svg_file and xml_file and xml_file.exists():
+                    logger.info(f"No new SVG file found, regenerating from XML")
                     self._xml_to_svg(xml_file)
                     svg_file = xml_file.parent / f"{xml_file.stem}.svg"
-                else:
-                    logger.warning(f"No XML file found to regenerate SVG for {folder_name}")
+                elif not svg_file:
+                    logger.warning(f"No SVG or XML file found to regenerate for {folder_name}")
                     return False
             
             # Handle .updatexml: delete XML and regenerate everything
@@ -358,12 +379,20 @@ class IconConverter:
                 except Exception as e:
                     logger.error(f"Failed to delete {update_xml_file}: {e}")
                 
-                # If SVG exists, use it to regenerate XML, then regenerate everything
-                if svg_file and svg_file.exists():
+                # Re-scan for new XML file
+                xml_file = None
+                for file in folder_path.iterdir():
+                    if file.is_file() and file.suffix.lower() == '.xml':
+                        xml_file = file
+                        break
+                
+                # If no new XML found, try to regenerate from SVG
+                if not xml_file and svg_file and svg_file.exists():
+                    logger.info(f"No new XML file found, regenerating from SVG")
                     self._svg_to_xml(svg_file)
                     xml_file = svg_file.parent / f"{svg_file.stem}.xml"
-                else:
-                    logger.warning(f"No SVG file found to regenerate XML for {folder_name}")
+                elif not xml_file:
+                    logger.warning(f"No XML or SVG file found to regenerate for {folder_name}")
                     return False
             
             # Regenerate the converted files
@@ -381,8 +410,9 @@ class IconConverter:
                 else:
                     logger.error(f"Failed to regenerate {folder_name}")
                     return False
+            return False
         
-        # Normal processing (for newly discovered icons)
+        # Normal processing (for newly discovered icons) - only if NO update files
         if folder_name in self.converted_files and not self.force_regenerate:
             logger.info(f"Skipping {folder_name} (already converted)")
             return True

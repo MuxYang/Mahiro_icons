@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800px" height="800px" viewBox="0 0 100 100" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="right_balanced_gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F9B7AB"/>
+      <stop offset="100%" stop-color="#F2A294"/>
+    </linearGradient>
+    <linearGradient id="left_balanced_gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F1E0E0"/>
+      <stop offset="100%" stop-color="#CDC1C1"/>
+    </linearGradient>
+  </defs>
+  <g transform="scale(0.521)">
+    <g transform="scale(1.8) translate(3,3)">
+      <path 
+        fill="url(#right_balanced_gradient)" 
+        d="m 81,11 a 50,50 1 1 0 0,78 a 36.9,45 0 1 1 0,-78"
+      />
+      <path 
+        fill="url(#left_balanced_gradient)" 
+        d="m 36,19 a 36.9,45 1 0 1 45,-8 a 50,50 1 0 1 0,78 a 36.9,45 1 0 1 -45,-8 a 26.5,35 1 1 0 0,-62"
+      /> 
+    </g>
+  </g>
+</svg>
