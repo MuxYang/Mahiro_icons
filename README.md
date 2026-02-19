@@ -28,3 +28,7 @@ svg格式必须为**800x800**的大小，如果图标本身不是正方形的或
 pip install -r requirements.txt
 python icon_converter.py
 ```
+
+该脚本将会:
+- 检查相关设置是否符合要求
+- 创建相关尺寸的图片
